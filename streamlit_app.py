@@ -26,8 +26,7 @@ st.markdown("""
 @st.cache_resource
 def load_assets():
     if not os.path.exists('model.pkl'):
-        st.info("Model not found. Training models for the first time... This will take about 1 minute.")
-        # Run training inside a try-except to catch and clear cache if it fails
+        st.info("Model not found. Training models for the first time... This will take about 1-2 minutes.")
         try:
             train_all('restaurant_sales_data.csv')
         except Exception as e:
@@ -127,10 +126,15 @@ with tab1:
         if submit_button:
             row = build_feature_row(restaurant_type, menu_item, meal_type, date_str, selling_price, weather, promotion, special_event)
             prediction = int(round(float(model.predict(row)[0])))
+            
+            # SAFE Confidence Range calculation for any model type
             low, high = prediction, prediction
-            if hasattr(model, 'estimators_'):
-                preds = np.array([t.predict(row.values)[0] for t in model.estimators_])
-                low, high = np.percentile(preds, [10, 90])
+            if hasattr(model, 'estimators_') and isinstance(model.estimators_, (list, np.ndarray)):
+                try:
+                    preds = np.array([t.predict(row.values)[0] for t in model.estimators_])
+                    low, high = np.percentile(preds, [10, 90])
+                except Exception:
+                    pass
 
             st.markdown(f"""
             <div class="prediction-box">
