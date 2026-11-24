@@ -10,3 +10,5 @@ seaborn
 python-dotenv
 streamlit
 plotly
+fpdf
+
