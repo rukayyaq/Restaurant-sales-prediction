@@ -4,15 +4,16 @@ import joblib
 import numpy as np
 import plotly.express as px
 import datetime
-import io
 import os
-import subprocess
 from fpdf import FPDF
+
+# Import the training function directly from models.py
+from models import train_all
 
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Restaurant Sales Predictor", page_icon="🍽️", layout="wide")
 
-# Custom CSS to make it look dark and professional
+# Custom CSS
 st.markdown("""
 <style>
     .stApp { background-color: #0f172a; color: #f8fafc; }
@@ -21,17 +22,15 @@ st.markdown("""
     .stButton>button:hover { background-color: #4f46e5; }
     .prediction-box { background: linear-gradient(135deg, #1e293b, #0f172a); border-left: 5px solid #10b981; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 20px;}
     .prediction-number { font-size: 80px; color: #10b981; font-weight: bold; margin: 0; }
-    .alert-box { padding: 10px; border-radius: 5px; margin-top: 10px; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
 # --- LOAD MODEL & DATA (With Auto-Train) ---
 @st.cache_resource
 def load_assets():
-    # Check if model exists, if not, train it automatically on the cloud
     if not os.path.exists('model.pkl'):
-        st.info("🛠️ Model not found in repository. Training models for the first time... This will take about 1 minute.")
-        subprocess.run(["python", "train_model.py"])
+        st.info("Model not found in repository. Training models for the first time... This will take about 1 minute.")
+        train_all('restaurant_sales_data.csv') 
     
     model = joblib.load('model.pkl')
     with open('feature_cols.pkl', 'rb') as f:
@@ -42,7 +41,7 @@ def load_assets():
 try:
     model, FEATURE_COLS, df_analytics = load_assets()
 except Exception as e:
-    st.error(f"Error loading models. Please check the logs. Error: {e}")
+    st.error(f"Error loading models: {e}")
     st.stop()
 
 # --- HELPER FUNCTIONS ---
@@ -80,22 +79,16 @@ def build_feature_row(restaurant_type, menu_item, meal_type, date_str, selling_p
 def generate_pdf(data):
     pdf = FPDF()
     pdf.add_page()
-    
-    # Header
     pdf.set_font("Arial", 'B', 20)
     pdf.cell(200, 10, txt="SalesPredict - AI Forecast", ln=True, align='C')
     pdf.set_font("Arial", size=10)
     pdf.cell(200, 10, txt=f"Generated on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=True, align='C')
     pdf.ln(10)
-
-    # Prediction Box
-    pdf.set_fill_color(16, 185, 129) # Green
+    pdf.set_fill_color(16, 185, 129)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Arial", 'B', 16)
     pdf.cell(200, 20, txt=f"PREDICTED QUANTITY: {data['prediction']} units", ln=True, align='C', fill=True)
     pdf.ln(15)
-
-    # Details
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Arial", size=12)
     pdf.cell(100, 10, txt=f"Menu Item: {data['menu_item']}", ln=False)
@@ -106,23 +99,17 @@ def generate_pdf(data):
     pdf.cell(100, 10, txt=f"Promotion: {data['promo']}", ln=True)
     pdf.cell(100, 10, txt=f"Date: {data['date']}", ln=False)
     pdf.cell(100, 10, txt=f"Special Event: {data['event']}", ln=True)
-    
     pdf.ln(10)
     pdf.set_font("Arial", 'I', 10)
     pdf.cell(200, 10, txt=f"Confidence Range: {data['conf_low']} - {data['conf_high']} units", ln=True, align='C')
-
     return pdf.output(dest='S').encode('latin-1')
 
 # --- MAIN APP LAYOUT ---
-st.title("🍽️ Restaurant Sales Predictor")
-st.markdown("Enter the details below to forecast sales using our ML models.")
+st.title("Restaurant Sales Predictor")
+tab1, tab2, tab3 = st.tabs(["Predict Sales", "Analytics Dashboard", "Batch Predict"])
 
-tab1, tab2, tab3 = st.tabs(["🔮 Predict Sales", "📊 Analytics Dashboard", "📂 Batch Predict"])
-
-# ================= TAB 1: PREDICTION =================
 with tab1:
     col1, col2 = st.columns([1, 1])
-    
     with col1:
         with st.form("prediction_form"):
             st.subheader("Input Details")
@@ -134,14 +121,12 @@ with tab1:
             weather = st.selectbox("Weather", ['Sunny', 'Rainy'])
             promotion = st.selectbox("Has Promotion?", ['True', 'False'])
             special_event = st.selectbox("Special Event?", ['True', 'False'])
-            
-            submit_button = st.form_submit_button(label="🔮 Generate Prediction")
+            submit_button = st.form_submit_button(label="Generate Prediction")
 
     with col2:
         if submit_button:
             row = build_feature_row(restaurant_type, menu_item, meal_type, date_str, selling_price, weather, promotion, special_event)
             prediction = int(round(float(model.predict(row)[0])))
-            
             low, high = prediction, prediction
             if hasattr(model, 'estimators_'):
                 preds = np.array([t.predict(row.values)[0] for t in model.estimators_])
@@ -157,9 +142,9 @@ with tab1:
             """, unsafe_allow_html=True)
 
             if prediction > 300:
-                st.warning("⚠️ High volume predicted! Ensure staff and ingredients are prepared.")
+                st.warning("High volume predicted! Ensure staff and ingredients are prepared.")
             elif prediction < 50:
-                st.info("📉 Low volume predicted. Consider running a promotion.")
+                st.info("Low volume predicted. Consider running a promotion.")
 
             pdf_data = {
                 'prediction': prediction, 'menu_item': menu_item, 'price': selling_price,
@@ -168,24 +153,13 @@ with tab1:
                 'conf_low': int(round(low)), 'conf_high': int(round(high))
             }
             pdf_bytes = generate_pdf(pdf_data)
-            
-            st.download_button(
-                label="📄 Download PDF Report",
-                data=pdf_bytes,
-                file_name="Sales_Prediction_Report.pdf",
-                mime="application/pdf"
-            )
+            st.download_button(label="Download PDF Report", data=pdf_bytes, file_name="Sales_Report.pdf", mime="application/pdf")
 
-    # --- LIVE SIMULATOR SECTION ---
     st.markdown("---")
-    st.markdown("### 🎛️ Live Price Simulator")
-    st.markdown("Adjust the selling price below to see how it impacts predicted sales instantly.")
-    
+    st.markdown("### Live Price Simulator")
     sim_price = st.slider("Simulated Selling Price (RM)", min_value=5.0, max_value=50.0, value=12.50, step=0.50)
-    
     sim_row = build_feature_row(restaurant_type, menu_item, meal_type, date_str, sim_price, weather, promotion, special_event)
     sim_pred = int(round(float(model.predict(sim_row)[0])))
-    
     st.markdown(f"""
     <div style="background-color: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid rgba(56, 189, 248, 0.3);">
         <span style="font-size: 16px;">Predicted Sales: </span>
@@ -194,60 +168,47 @@ with tab1:
     </div>
     """, unsafe_allow_html=True)
 
-# ================= TAB 2: ANALYTICS =================
 with tab2:
-    st.subheader("📊 Analytics Dashboard")
-    
+    st.subheader("Analytics Dashboard")
     col_a, col_b = st.columns(2)
     with col_a:
         top_dishes = df_analytics.groupby('menu_item_name')['quantity_sold'].sum().sort_values(ascending=False).head(5).reset_index()
-        fig1 = px.bar(top_dishes, x='menu_item_name', y='quantity_sold', title="🏆 Top 5 Dishes", template="plotly_dark", color_discrete_sequence=['#6366f1'])
+        fig1 = px.bar(top_dishes, x='menu_item_name', y='quantity_sold', title="Top 5 Dishes", template="plotly_dark", color_discrete_sequence=['#6366f1'])
         st.plotly_chart(fig1, use_container_width=True)
-        
     with col_b:
         meal_type = df_analytics.groupby('meal_type')['quantity_sold'].mean().reset_index()
-        fig2 = px.pie(meal_type, names='meal_type', values='quantity_sold', title="🍽️ Sales by Meal Type", template="plotly_dark", hole=0.4)
+        fig2 = px.pie(meal_type, names='meal_type', values='quantity_sold', title="Sales by Meal Type", template="plotly_dark", hole=0.4)
         st.plotly_chart(fig2, use_container_width=True)
-
     col_c, col_d = st.columns(2)
     with col_c:
         weather = df_analytics.groupby('weather_condition')['quantity_sold'].mean().reset_index()
-        fig3 = px.bar(weather, x='weather_condition', y='quantity_sold', title="🌤️ Avg Sales by Weather", template="plotly_dark", color_discrete_sequence=['#10b981'])
+        fig3 = px.bar(weather, x='weather_condition', y='quantity_sold', title="Avg Sales by Weather", template="plotly_dark", color_discrete_sequence=['#10b981'])
         st.plotly_chart(fig3, use_container_width=True)
-        
     with col_d:
         df_analytics['date'] = pd.to_datetime(df_analytics['date'])
         df_analytics['month'] = df_analytics['date'].dt.month
         df_analytics['revenue'] = df_analytics['quantity_sold'] * df_analytics['actual_selling_price']
         monthly = df_analytics.groupby('month')['revenue'].sum().reset_index()
-        fig4 = px.line(monthly, x='month', y='revenue', title="💹 Monthly Revenue", template="plotly_dark", markers=True)
+        fig4 = px.line(monthly, x='month', y='revenue', title="Monthly Revenue", template="plotly_dark", markers=True)
         st.plotly_chart(fig4, use_container_width=True)
 
-# ================= TAB 3: BATCH PREDICT =================
 with tab3:
-    st.subheader("📂 Batch Prediction")
-    st.markdown("Upload a CSV with columns: `restaurant_type, menu_item, meal_type, date, selling_price, weather, promotion, event`")
-    
+    st.subheader("Batch Prediction")
     uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
-    
     if uploaded_file is not None:
         df_upload = pd.read_csv(uploaded_file)
         df_upload.columns = [c.lower().strip().replace(' ', '_') for c in df_upload.columns]
-        
         defaults = {'restaurant_type': 'Casual Dining', 'menu_item': 'Nasi Lemak', 'meal_type': 'Lunch', 'date': '2025-11-24', 'selling_price': 10.0, 'weather': 'Sunny', 'promotion': 'False', 'event': 'False'}
         for col, default_val in defaults.items():
             if col not in df_upload.columns:
                 df_upload[col] = default_val
-
         if st.button("Run Batch Prediction"):
             preds = []
             for _, r in df_upload.iterrows():
                 row = build_feature_row(r['restaurant_type'], r['menu_item'], r['meal_type'], r['date'], r['selling_price'], r['weather'], r['promotion'], r['event'])
                 preds.append(int(round(float(model.predict(row)[0]))))
-            
             df_upload['predicted_quantity'] = preds
-            st.success("✅ Predictions generated!")
+            st.success("Predictions generated successfully!")
             st.dataframe(df_upload)
-            
             csv = df_upload.to_csv(index=False).encode('utf-8')
-            st.download_button("⬇️ Download Results CSV", csv, "batch_predictions.csv", "text/csv")
+            st.download_button("Download Results CSV", csv, "batch_predictions.csv", "text/csv")
