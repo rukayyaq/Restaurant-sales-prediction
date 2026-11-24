@@ -5,6 +5,8 @@ import numpy as np
 import plotly.express as px
 import datetime
 import io
+import os
+import subprocess
 from fpdf import FPDF
 
 # --- CONFIGURATION ---
@@ -20,13 +22,17 @@ st.markdown("""
     .prediction-box { background: linear-gradient(135deg, #1e293b, #0f172a); border-left: 5px solid #10b981; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 20px;}
     .prediction-number { font-size: 80px; color: #10b981; font-weight: bold; margin: 0; }
     .alert-box { padding: 10px; border-radius: 5px; margin-top: 10px; font-weight: bold; }
-    .simulator-box { background: #1e293b; padding: 20px; border-radius: 10px; border: 1px solid #334155; margin-top: 20px; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- LOAD MODEL & DATA ---
+# --- LOAD MODEL & DATA (With Auto-Train) ---
 @st.cache_resource
 def load_assets():
+    # Check if model exists, if not, train it automatically on the cloud
+    if not os.path.exists('model.pkl'):
+        st.info("🛠️ Model not found in repository. Training models for the first time... This will take about 1 minute.")
+        subprocess.run(["python", "train_model.py"])
+    
     model = joblib.load('model.pkl')
     with open('feature_cols.pkl', 'rb') as f:
         feature_cols = joblib.load(f)
@@ -36,7 +42,7 @@ def load_assets():
 try:
     model, FEATURE_COLS, df_analytics = load_assets()
 except Exception as e:
-    st.error(f"Error loading models. Make sure model.pkl and feature_cols.pkl exist. Error: {e}")
+    st.error(f"Error loading models. Please check the logs. Error: {e}")
     st.stop()
 
 # --- HELPER FUNCTIONS ---
@@ -133,17 +139,14 @@ with tab1:
 
     with col2:
         if submit_button:
-            # Build features and predict
             row = build_feature_row(restaurant_type, menu_item, meal_type, date_str, selling_price, weather, promotion, special_event)
             prediction = int(round(float(model.predict(row)[0])))
             
-            # Calculate confidence
             low, high = prediction, prediction
             if hasattr(model, 'estimators_'):
                 preds = np.array([t.predict(row.values)[0] for t in model.estimators_])
                 low, high = np.percentile(preds, [10, 90])
 
-            # Display Result
             st.markdown(f"""
             <div class="prediction-box">
                 <h3 style="margin:0;">Predicted Quantity</h3>
@@ -153,13 +156,11 @@ with tab1:
             </div>
             """, unsafe_allow_html=True)
 
-            # Alerts
             if prediction > 300:
                 st.warning("⚠️ High volume predicted! Ensure staff and ingredients are prepared.")
             elif prediction < 50:
                 st.info("📉 Low volume predicted. Consider running a promotion.")
 
-            # PDF Generation
             pdf_data = {
                 'prediction': prediction, 'menu_item': menu_item, 'price': selling_price,
                 'restaurant': restaurant_type, 'weather': weather, 'meal': meal_type,
@@ -180,32 +181,23 @@ with tab1:
     st.markdown("### 🎛️ Live Price Simulator")
     st.markdown("Adjust the selling price below to see how it impacts predicted sales instantly.")
     
-    sim_box = st.container()
-    with sim_box:
-        # Using a slider outside the form so it triggers updates dynamically
-        sim_price = st.slider("Simulated Selling Price (RM)", min_value=5.0, max_value=50.0, value=12.50, step=0.50)
-        
-        # Create a placeholder for the result so it updates instantly
-        sim_result_placeholder = st.empty()
-        
-        # Build features using the SIMULATED price
-        sim_row = build_feature_row(restaurant_type, menu_item, meal_type, date_str, sim_price, weather, promotion, special_event)
-        sim_pred = int(round(float(model.predict(sim_row)[0])))
-        
-        # Display the result in a glowing blue box
-        sim_result_placeholder.markdown(f"""
-        <div style="background-color: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid rgba(56, 189, 248, 0.3);">
-            <span style="font-size: 16px;">Predicted Sales: </span>
-            <strong style="font-size: 28px;">{sim_pred}</strong>
-            <span style="font-size: 16px;"> units</span>
-        </div>
-        """, unsafe_allow_html=True)
+    sim_price = st.slider("Simulated Selling Price (RM)", min_value=5.0, max_value=50.0, value=12.50, step=0.50)
+    
+    sim_row = build_feature_row(restaurant_type, menu_item, meal_type, date_str, sim_price, weather, promotion, special_event)
+    sim_pred = int(round(float(model.predict(sim_row)[0])))
+    
+    st.markdown(f"""
+    <div style="background-color: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid rgba(56, 189, 248, 0.3);">
+        <span style="font-size: 16px;">Predicted Sales: </span>
+        <strong style="font-size: 28px;">{sim_pred}</strong>
+        <span style="font-size: 16px;"> units</span>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ================= TAB 2: ANALYTICS =================
 with tab2:
     st.subheader("📊 Analytics Dashboard")
     
-    # Top Dishes
     col_a, col_b = st.columns(2)
     with col_a:
         top_dishes = df_analytics.groupby('menu_item_name')['quantity_sold'].sum().sort_values(ascending=False).head(5).reset_index()
@@ -217,7 +209,6 @@ with tab2:
         fig2 = px.pie(meal_type, names='meal_type', values='quantity_sold', title="🍽️ Sales by Meal Type", template="plotly_dark", hole=0.4)
         st.plotly_chart(fig2, use_container_width=True)
 
-    # Weather & Revenue
     col_c, col_d = st.columns(2)
     with col_c:
         weather = df_analytics.groupby('weather_condition')['quantity_sold'].mean().reset_index()
@@ -243,7 +234,6 @@ with tab3:
         df_upload = pd.read_csv(uploaded_file)
         df_upload.columns = [c.lower().strip().replace(' ', '_') for c in df_upload.columns]
         
-        # Fill missing
         defaults = {'restaurant_type': 'Casual Dining', 'menu_item': 'Nasi Lemak', 'meal_type': 'Lunch', 'date': '2025-11-24', 'selling_price': 10.0, 'weather': 'Sunny', 'promotion': 'False', 'event': 'False'}
         for col, default_val in defaults.items():
             if col not in df_upload.columns:
