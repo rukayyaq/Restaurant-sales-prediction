@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Analytics Dashboard{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold mb-0">📊 Analytics Dashboard</h2>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-md-4">
+    <div class="card text-bg-primary h-100 border-0 shadow-sm">
+      <div class="card-body p-4">
+        <h6 class="text-uppercase text-white-50 mb-2">Total Sales</h6>
+        <h2 class="fw-bold mb-0 text-white" id="kpi-sales">—</h2>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card text-bg-success h-100 border-0 shadow-sm">
+      <div class="card-body p-4">
+        <h6 class="text-uppercase text-white-50 mb-2">Total Revenue (RM)</h6>
+        <h2 class="fw-bold mb-0 text-white" id="kpi-revenue">—</h2>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card text-bg-warning h-100 border-0 shadow-sm">
+      <div class="card-body p-4">
+        <h6 class="text-uppercase text-white-50 mb-2">Total Profit (RM)</h6>
+        <h2 class="fw-bold mb-0 text-white" id="kpi-profit">—</h2>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-md-6">
+    <div class="card p-4 h-100 border-0 shadow-sm">
+      <h5 class="mb-4 text-white">🏆 Top Dishes</h5>
+      <div style="position: relative; height: 250px; width: 100%;">
+        <canvas id="chartTop"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card p-4 h-100 border-0 shadow-sm">
+      <h5 class="mb-4 text-white">🍽️ Avg Sales by Meal Type</h5>
+      <div style="position: relative; height: 250px; width: 100%;">
+        <canvas id="chartMeal"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card p-4 h-100 border-0 shadow-sm">
+      <h5 class="mb-4 text-white">🌤️ Avg Sales by Weather</h5>
+      <div style="position: relative; height: 250px; width: 100%;">
+        <canvas id="chartWeather"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card p-4 h-100 border-0 shadow-sm">
+      <h5 class="mb-4 text-white">💹 Revenue vs Profit by Month</h5>
+      <div style="position: relative; height: 250px; width: 100%;">
+        <canvas id="chartRevenue"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card p-4 h-100 border-0 shadow-sm">
+      <h5 class="mb-4 text-white">🔥 Day × Meal Heatmap</h5>
+      <div style="position: relative; height: 250px; width: 100%;">
+        <canvas id="chartHeat"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card p-4 h-100 border-0 shadow-sm">
+      <h5 class="mb-4 text-white">🎯 Promotion / Event Impact</h5>
+      <div id="impactBox" class="text-white-50">Loading…</div>
+    </div>
+  </div>
+  <div class="col-12">
+    <div class="card p-4 border-0 shadow-sm">
+      <h5 class="mb-4 text-white">💰 Margin by Menu Item</h5>
+      <div class="table-responsive">
+        <table id="marginTable" class="table table-sm table-striped"></table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  Chart.defaults.color = '#94a3b8';
+  Chart.defaults.borderColor = 'rgba(255,255,255,0.1)';
+</script>
+<script src="{{ url_for('static', filename='js/analytics.js') }}?v=99"></script>
+{% endblock %}

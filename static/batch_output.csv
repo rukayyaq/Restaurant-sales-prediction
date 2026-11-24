@@ -1,0 +1,2 @@
+restaurant_type,menu_item,meal_type,date,selling_price,weather,promotion,event,predicted_quantity
+Casual Dining,Nasi Lemak,Lunch,2025-11-24,12.5,Sunny,True,False,397

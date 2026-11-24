@@ -1,0 +1,12 @@
+flask
+flask-login
+pandas
+scikit-learn
+joblib
+xgboost
+numpy
+matplotlib
+seaborn
+python-dotenv
+streamlit
+plotly

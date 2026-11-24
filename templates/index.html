@@ -1,0 +1,356 @@
+{% extends "base.html" %}
+{% block title %}Predict Sales{% endblock %}
+
+{% block content %}
+<div class="text-center mb-5 mt-2">
+  <h1 class="fw-bold">Predict Quantity Sold</h1>
+  <p style="color: #94a3b8;">Enter the restaurant details below to forecast sales using our ML models.</p>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-10">
+    
+    <!-- RESULT BOX -->
+    {% if prediction is defined %}
+    
+    <!-- Hidden data container for the PDF generator -->
+    <div id="pdf-data" 
+         data-prediction="{{ prediction }}"
+         data-alert="{{ alert if alert else '' }}"
+         data-menu="{{ input_data.menu_item }}"
+         data-restaurant="{{ input_data.restaurant_type }}"
+         data-meal="{{ input_data.meal_type }}"
+         data-date="{{ input_data.date }}"
+         data-price="{{ input_data.selling_price }}"
+         data-weather="{{ input_data.weather }}"
+         data-promo="{{ input_data.promotion }}"
+         data-event="{{ input_data.event }}"
+         data-conf="{{ confidence_low }} - {{ confidence_high }}"
+         style="display: none;">
+    </div>
+
+    <div class="mb-4">
+        <div id="web-report" class="p-5 rounded" style="background: linear-gradient(135deg, #1e293b, #0f172a); border: 1px solid #334155; color: white;">
+            
+            <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary pb-3">
+                <div>
+                    <h2 class="fw-bold mb-0 text-white">🍽️ SalesPredict</h2>
+                    <small class="text-white-50">AI Sales Forecast Report</small>
+                </div>
+                <div class="text-end">
+                    <small class="text-white-50">Generated On:</small><br>
+                    <strong class="text-white" id="web-date"></strong>
+                </div>
+            </div>
+
+            <div class="text-center my-4">
+                <h6 class="text-uppercase fw-bold tracking-wide" style="color: #94a3b8 !important;">Predicted Quantity</h6>
+                <h1 class="display-1 fw-bold mb-0" style="color: #10b981 !important; text-shadow: 0 0 20px rgba(16,185,129,0.3);">{{ prediction }}</h1>
+                <p class="fs-5 mb-2" style="color: #94a3b8 !important;">units expected to be sold</p>
+                
+                {% if alert %}
+                <div class="alert {% if 'High' in alert %}alert-warning text-dark{% else %}alert-info text-dark{% endif %} d-inline-block mt-2 mb-3 fw-bold px-4 rounded-pill shadow-sm">
+                    {{ alert }}
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="row mt-4 pt-3 border-top border-secondary">
+                <div class="col-md-6">
+                    <h6 class="mb-3" style="color: #94a3b8 !important;">📋 Input Details</h6>
+                    <table class="table table-sm table-borderless text-white">
+                        <tr><td width="40%" style="color: #94a3b8 !important;">Menu Item:</td><td class="fw-bold text-white">{{ input_data.menu_item }}</td></tr>
+                        <tr><td style="color: #94a3b8 !important;">Restaurant:</td><td class="text-white">{{ input_data.restaurant_type }}</td></tr>
+                        <tr><td style="color: #94a3b8 !important;">Meal Type:</td><td class="text-white">{{ input_data.meal_type }}</td></tr>
+                        <tr><td style="color: #94a3b8 !important;">Date:</td><td class="text-white">{{ input_data.date }}</td></tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="mb-3" style="color: #94a3b8 !important;">🎯 Conditions</h6>
+                    <table class="table table-sm table-borderless text-white">
+                        <tr><td width="40%" style="color: #94a3b8 !important;">Selling Price:</td><td class="fw-bold text-white">RM {{ input_data.selling_price }}</td></tr>
+                        <tr><td style="color: #94a3b8 !important;">Weather:</td><td class="text-white">{{ input_data.weather }}</td></tr>
+                        <tr><td style="color: #94a3b8 !important;">Promotion:</td><td class="text-white">{{ input_data.promotion }}</td></tr>
+                        <tr><td style="color: #94a3b8 !important;">Special Event:</td><td class="text-white">{{ input_data.event }}</td></tr>
+                    </table>
+                </div>
+            </div>
+
+            <div class="mt-4 p-3 rounded" style="background: rgba(255,255,255,0.05);">
+                <p class="mb-0 text-center" style="color: #94a3b8 !important;">
+                    Confidence Range: <strong class="text-white">{{ confidence_low }} - {{ confidence_high }} units</strong>
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="text-center mb-4">
+        <button onclick="downloadPDF()" class="btn btn-outline-success fw-bold px-4 py-2">
+            📄 Download PDF Report
+        </button>
+    </div>
+    {% endif %}
+
+    {% if error %}
+    <div class="alert alert-danger shadow-sm">❌ {{ error }}</div>
+    {% endif %}
+
+    <!-- FORM & SIMULATOR CARD -->
+    <div class="card p-4 shadow-lg border-0">
+      <form method="POST" action="{{ url_for('predict') }}" id="prediction-form" class="row g-4">
+        
+        <div class="col-md-4">
+          <label class="form-label">Restaurant Type</label>
+          <select name="restaurant_type" class="form-select" required>
+            {% set v = input_data.restaurant_type if input_data else '' %}
+            {% for opt in ['Casual Dining','Fine Dining','Food Stall','Kopitiam'] %}
+            <option {% if v==opt %}selected{% endif %}>{{ opt }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Menu Item</label>
+          <select name="menu_item" class="form-select" required>
+            {% set v = input_data.menu_item if input_data else '' %}
+            {% for opt in ['Nasi Lemak','Laksa','Chicken Rice','Char Kway Teow','Roti Canai',
+                           'Teh Tarik','Iced Lemon Tea','Kaya Toast Set','Cendol',
+                           'Chicken Chop','Mushroom Soup','Spaghetti Carbonara','Tandoori Chicken'] %}
+            <option {% if v==opt %}selected{% endif %}>{{ opt }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Meal Type</label>
+          <select name="meal_type" class="form-select" required>
+            {% set v = input_data.meal_type if input_data else '' %}
+            {% for opt in ['Lunch','Dinner'] %}
+            <option {% if v==opt %}selected{% endif %}>{{ opt }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Date</label>
+          <input type="date" name="date" class="form-control" required
+                 value="{{ input_data.date if input_data else '' }}">
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Selling Price (RM)</label>
+          <input type="number" step="0.01" name="selling_price" id="main-price-input" class="form-control" required
+                 placeholder="e.g. 12.50" value="{{ input_data.selling_price if input_data else '12.50' }}">
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Weather Condition</label>
+          <select name="weather" class="form-select" required>
+            {% set v = input_data.weather if input_data else '' %}
+            {% for opt in ['Sunny','Rainy'] %}
+            <option {% if v==opt %}selected{% endif %}>{{ opt }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Has Promotion?</label>
+          <select name="promotion" class="form-select" required>
+            {% set v = input_data.promotion if input_data else '' %}
+            {% for opt in ['True','False'] %}
+            <option {% if v==opt %}selected{% endif %}>{{ opt }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Special Event?</label>
+          <select name="event" class="form-select" required>
+            {% set v = input_data.event if input_data else '' %}
+            {% for opt in ['True','False'] %}
+            <option {% if v==opt %}selected{% endif %}>{{ opt }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-12 text-center mt-5 mb-3">
+          <button class="btn btn-primary btn-lg px-5" type="submit">🔮 Generate Prediction</button>
+          <a href="{{ url_for('batch_predict') }}" class="btn btn-outline-secondary btn-lg ms-2 px-4">📂 Batch Process</a>
+        </div>
+      </form>
+
+      <hr style="border-color: #334155; margin: 2rem 0;">
+
+      <!-- LIVE SIMULATOR -->
+      <div class="p-4 rounded" style="background-color: #0f172a; border: 1px solid #334155;">
+        <h5 class="text-white mb-2">🎛️ Live Price Simulator</h5>
+        <p class="text-light mb-3" style="opacity: 0.8;">Drag the slider to see how changing the price affects the prediction in real-time.</p>
+        
+        <div class="row align-items-center">
+            <div class="col-md-7">
+                <label class="form-label d-flex justify-content-between text-white mb-2">
+                    <span>Simulated Selling Price</span>
+                    <span class="fw-bold" style="color: var(--accent);" id="price-display">RM 12.50</span>
+                </label>
+                <input type="range" class="form-range" id="price-slider" min="5" max="50" step="0.5" value="12.5">
+            </div>
+            <div class="col-md-5 mt-3 mt-md-0">
+                <div class="alert mb-0 text-center border-0 shadow-sm" id="simulator-result" style="background-color: rgba(56, 189, 248, 0.15); color: #38bdf8;">
+                    Predicted Sales: <strong>—</strong>
+                </div>
+            </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const now = new Date();
+    const dateString = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute:'2-digit' });
+    if(document.getElementById('web-date')) document.getElementById('web-date').textContent = dateString;
+
+    const slider = document.getElementById('price-slider');
+    if (slider) {
+        const priceDisplay = document.getElementById('price-display');
+        const mainPriceInput = document.getElementById('main-price-input');
+        const resultBox = document.getElementById('simulator-result');
+        const form = document.getElementById('prediction-form');
+
+        slider.addEventListener('input', async function(e) {
+            const price = parseFloat(e.target.value).toFixed(2);
+            priceDisplay.textContent = `RM ${price}`;
+            mainPriceInput.value = price;
+            resultBox.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Calculating...`;
+
+            const formData = new FormData(form);
+            formData.set('selling_price', price);
+            const obj = {};
+            formData.forEach((value, key) => obj[key] = value);
+
+            try {
+                const res = await fetch('/api/predict', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(obj)
+                });
+                const data = await res.json();
+                if (data.prediction) {
+                    resultBox.innerHTML = `Predicted Sales: <strong style="font-size: 1.4rem;">${data.prediction}</strong> units`;
+                }
+            } catch (err) {
+                resultBox.innerHTML = `Error connecting to server`;
+            }
+        });
+    }
+});
+
+function downloadPDF() {
+    const dataEl = document.getElementById('pdf-data');
+    if (!dataEl) return;
+
+    const prediction = dataEl.getAttribute('data-prediction');
+    const alertMsg = dataEl.getAttribute('data-alert');
+    const menuItem = dataEl.getAttribute('data-menu');
+    const restaurant = dataEl.getAttribute('data-restaurant');
+    const meal = dataEl.getAttribute('data-meal');
+    const date = dataEl.getAttribute('data-date');
+    const price = dataEl.getAttribute('data-price');
+    const weather = dataEl.getAttribute('data-weather');
+    const promo = dataEl.getAttribute('data-promo');
+    const event = dataEl.getAttribute('data-event');
+    const confRange = dataEl.getAttribute('data-conf');
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    const now = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute:'2-digit' });
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(22);
+    doc.setTextColor(40, 40, 40);
+    doc.text("SalesPredict", 14, 20);
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text("AI Sales Forecast Report", 14, 26);
+    doc.text("Generated On: " + now, 150, 20);
+
+    doc.setDrawColor(200, 200, 200);
+    doc.line(14, 30, 196, 30);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(100, 100, 100);
+    doc.text("PREDICTED QUANTITY", 105, 45, { align: "center" });
+
+    doc.setFontSize(48);
+    doc.setTextColor(16, 185, 129); 
+    doc.text(prediction, 105, 60, { align: "center" });
+
+    doc.setFontSize(12);
+    doc.setTextColor(100, 100, 100);
+    doc.text("units expected to be sold", 105, 68, { align: "center" });
+
+    let currentY = 75;
+    if (alertMsg && alertMsg !== "None") {
+        doc.setFontSize(10);
+        doc.setTextColor(180, 50, 50);
+        doc.text(alertMsg, 105, currentY, { align: "center" });
+        currentY += 10;
+    }
+
+    doc.setFontSize(12);
+    doc.setTextColor(40, 40, 40);
+    doc.text("Input Details", 14, currentY + 5);
+    doc.text("Conditions", 110, currentY + 5);
+
+    doc.autoTable({
+        startY: currentY + 10,
+        margin: { left: 14 },
+        tableWidth: 85,
+        theme: 'plain',
+        styles: { fontSize: 10, cellPadding: 2 },
+        columnStyles: { 0: { textColor: 100 }, 1: { fontStyle: 'bold' } },
+        body: [
+            ['Menu Item:', menuItem],
+            ['Restaurant:', restaurant],
+            ['Meal Type:', meal],
+            ['Date:', date]
+        ]
+    });
+
+    doc.autoTable({
+        startY: currentY + 10,
+        margin: { left: 110 },
+        tableWidth: 85,
+        theme: 'plain',
+        styles: { fontSize: 10, cellPadding: 2 },
+        columnStyles: { 0: { textColor: 100 }, 1: { fontStyle: 'bold' } },
+        body: [
+            ['Selling Price:', 'RM ' + price],
+            ['Weather:', weather],
+            ['Promotion:', promo],
+            ['Special Event:', event]
+        ]
+    });
+
+    const finalY = doc.lastAutoTable.finalY + 15;
+    doc.setFillColor(245, 245, 245);
+    doc.rect(14, finalY, 182, 12, 'F');
+    doc.setFontSize(10);
+    doc.setTextColor(80, 80, 80);
+    doc.text("Confidence Range: " + confRange + " units", 105, finalY + 8, { align: "center" });
+
+    doc.save('Sales_Prediction_Report.pdf');
+}
+</script>
+{% endblock %}
