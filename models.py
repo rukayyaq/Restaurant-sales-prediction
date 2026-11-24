@@ -30,6 +30,10 @@ def build_training_data(csv_path='restaurant_sales_data.csv'):
     df['day'] = df['date'].dt.day
     df['is_weekend'] = (df['day_of_week'] >= 5).astype(int)
 
+    # Drop the text column that breaks the model
+    if 'key_ingredients_tags' in df.columns:
+        df = df.drop(['key_ingredients_tags'], axis=1)
+
     df_encoded = pd.get_dummies(df, columns=CATEGORICAL_COLS, drop_first=False)
 
     exclude = {'date', 'quantity_sold', 'revenue'}
@@ -59,11 +63,8 @@ def train_all(csv_path='restaurant_sales_data.csv'):
         joblib.dump(m, f'{name}.pkl')
         print(f"{name.capitalize():<18} R2={r2:.3f}  MAE={mae:.2f}  RMSE={rmse:.2f}")
 
-    # Save the best model as model.pkl
     best = max(results, key=lambda k: results[k]['r2'])
     joblib.dump(joblib.load(f'{best}.pkl'), 'model.pkl')
-    
-    # ✅ SAVE THE METRICS FILE (This makes the leaderboard show up!)
     joblib.dump(results, 'model_metrics.pkl')
     
     print(f"✅ All models trained and saved! {best.capitalize()} selected as the best model.")

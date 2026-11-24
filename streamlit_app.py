@@ -10,10 +10,8 @@ from fpdf import FPDF
 # Import the training function directly from models.py
 from models import train_all
 
-# --- CONFIGURATION ---
 st.set_page_config(page_title="Restaurant Sales Predictor", page_icon="🍽️", layout="wide")
 
-# Custom CSS
 st.markdown("""
 <style>
     .stApp { background-color: #0f172a; color: #f8fafc; }
@@ -25,12 +23,16 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- LOAD MODEL & DATA (With Auto-Train) ---
 @st.cache_resource
 def load_assets():
     if not os.path.exists('model.pkl'):
-        st.info("Model not found in repository. Training models for the first time... This will take about 1 minute.")
-        train_all('restaurant_sales_data.csv') 
+        st.info("Model not found. Training models for the first time... This will take about 1 minute.")
+        # Run training inside a try-except to catch and clear cache if it fails
+        try:
+            train_all('restaurant_sales_data.csv')
+        except Exception as e:
+            st.error(f"Training failed: {e}")
+            st.stop()
     
     model = joblib.load('model.pkl')
     with open('feature_cols.pkl', 'rb') as f:
@@ -44,7 +46,6 @@ except Exception as e:
     st.error(f"Error loading models: {e}")
     st.stop()
 
-# --- HELPER FUNCTIONS ---
 def build_feature_row(restaurant_type, menu_item, meal_type, date_str, selling_price, weather, promotion, special_event):
     dt = pd.to_datetime(date_str)
     day_of_week = dt.dayofweek
@@ -104,7 +105,6 @@ def generate_pdf(data):
     pdf.cell(200, 10, txt=f"Confidence Range: {data['conf_low']} - {data['conf_high']} units", ln=True, align='C')
     return pdf.output(dest='S').encode('latin-1')
 
-# --- MAIN APP LAYOUT ---
 st.title("Restaurant Sales Predictor")
 tab1, tab2, tab3 = st.tabs(["Predict Sales", "Analytics Dashboard", "Batch Predict"])
 
