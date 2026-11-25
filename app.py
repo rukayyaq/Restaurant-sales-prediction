@@ -5,19 +5,9 @@ import numpy as np
 from io import BytesIO
 from flask import Flask, render_template, request, jsonify, send_file
 from dotenv import load_dotenv
-import streamlit as st
+
 from models import load_model, predict_with_confidence
 from analytics_api import analytics_bp
-
-st.html("""
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-VYG5JYEEKJ"></script>
-<script>
-window.dataLayer = window.dataLayer || [];
-function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-gtag('config', 'G-VYG5JYEEKJ');
-</script>
-""", unsafe_allow_javascript=True)
 
 load_dotenv()
 
