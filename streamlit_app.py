@@ -23,15 +23,16 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def load_assets():
     if not os.path.exists('model.pkl'):
-        st.info("Model not found. Training models for the first time... This will take about 1-2 minutes.")
-        try:
-            train_all('restaurant_sales_data.csv')
-        except Exception as e:
-            st.error(f"Training failed: {e}")
-            st.stop()
+        # Using st.spinner makes the loading message disappear automatically when done
+        with st.spinner("Model not found. Training models for the first time... This will take about 1-2 minutes."):
+            try:
+                train_all('restaurant_sales_data.csv')
+            except Exception as e:
+                st.error(f"Training failed: {e}")
+                st.stop()
     
     model = joblib.load('model.pkl')
     with open('feature_cols.pkl', 'rb') as f:
@@ -180,13 +181,13 @@ with tab2:
         fig1 = px.bar(top_dishes, x='menu_item_name', y='quantity_sold', title="Top 5 Dishes", template="plotly_dark", color_discrete_sequence=['#6366f1'])
         st.plotly_chart(fig1, use_container_width=True)
     with col_b:
-        meal_type = df_analytics.groupby('meal_type')['quantity_sold'].mean().reset_index()
-        fig2 = px.pie(meal_type, names='meal_type', values='quantity_sold', title="Sales by Meal Type", template="plotly_dark", hole=0.4)
+        meal_type_df = df_analytics.groupby('meal_type')['quantity_sold'].mean().reset_index()
+        fig2 = px.pie(meal_type_df, names='meal_type', values='quantity_sold', title="Sales by Meal Type", template="plotly_dark", hole=0.4)
         st.plotly_chart(fig2, use_container_width=True)
     col_c, col_d = st.columns(2)
     with col_c:
-        weather = df_analytics.groupby('weather_condition')['quantity_sold'].mean().reset_index()
-        fig3 = px.bar(weather, x='weather_condition', y='quantity_sold', title="Avg Sales by Weather", template="plotly_dark", color_discrete_sequence=['#10b981'])
+        weather_df = df_analytics.groupby('weather_condition')['quantity_sold'].mean().reset_index()
+        fig3 = px.bar(weather_df, x='weather_condition', y='quantity_sold', title="Avg Sales by Weather", template="plotly_dark", color_discrete_sequence=['#10b981'])
         st.plotly_chart(fig3, use_container_width=True)
     with col_d:
         df_analytics['date'] = pd.to_datetime(df_analytics['date'])
